@@ -12,6 +12,7 @@ var (
 
 type Analyzer interface {
 	Analyze(text string) (terms []string)
+	String() string
 }
 
 type simpleAnalyzer struct{}
@@ -23,8 +24,16 @@ func (s simpleAnalyzer) Analyze(text string) []string {
 	})
 }
 
+func (s simpleAnalyzer) String() string {
+	return "SimpleAnalyzer"
+}
+
 type whitespaceAnalyzer struct{}
 
 func (w whitespaceAnalyzer) Analyze(text string) []string {
 	return strings.Fields(text)
+}
+
+func (w whitespaceAnalyzer) String() string {
+	return "WhiteSpaceAnalyzer"
 }

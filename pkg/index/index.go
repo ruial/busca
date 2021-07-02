@@ -9,8 +9,10 @@ import (
 	"github.com/ruial/busca/pkg/search"
 )
 
-var ErrDuplicateDocument = errors.New("Cannot index duplicate document")
-var ErrNonExistentDocument = errors.New("Document does not exist")
+var (
+	ErrDuplicateDocument   = errors.New("Cannot index duplicate document")
+	ErrNonExistentDocument = errors.New("Document does not exist")
+)
 
 type indexMode int
 
@@ -124,6 +126,10 @@ func (i *Index) HasDocument(id core.DocumentID) bool {
 	i.docsMutex.RLock()
 	defer i.docsMutex.RUnlock()
 	return i.hasDocument(id)
+}
+
+func (i *Index) GetAnalyzer() string {
+	return i.analyzer.String()
 }
 
 func (i *Index) filterDocuments(terms []string, filterFn search.Filter) map[core.DocumentID]core.DocumentData {
