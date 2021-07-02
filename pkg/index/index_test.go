@@ -26,9 +26,6 @@ func TestAdd(t *testing.T) {
 	if doc != idx.GetDocument(doc.ID()) {
 		t.Error("Document should be equal")
 	}
-	if !idx.HasDocument(doc.ID()) {
-		t.Error("Should have document")
-	}
 }
 
 func TestUpdate(t *testing.T) {
@@ -80,7 +77,7 @@ func TestDelete(t *testing.T) {
 	if err != ErrNonExistentDocument {
 		t.Error("Should throw error on deleting non existent document")
 	}
-	if idx.HasDocument(doc.ID()) || idx.GetDocument(doc.ID()) != nil {
+	if idx.GetDocument(doc.ID()) != nil {
 		t.Error("Should not have document anymore")
 	}
 	if idx.Length() != 0 || len(idx.terms) != 0 || len(idx.documents) != 0 {

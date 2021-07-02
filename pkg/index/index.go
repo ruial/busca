@@ -122,12 +122,6 @@ func (i *Index) hasDocument(id core.DocumentID) bool {
 	return ok
 }
 
-func (i *Index) HasDocument(id core.DocumentID) bool {
-	i.docsMutex.RLock()
-	defer i.docsMutex.RUnlock()
-	return i.hasDocument(id)
-}
-
 func (i *Index) GetAnalyzer() string {
 	return i.analyzer.String()
 }

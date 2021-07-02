@@ -20,7 +20,7 @@ type IdentifiableIndex struct {
 type IndexRepo interface {
 	GetIndexes() []IdentifiableIndex
 	GetIndex(id string) (IdentifiableIndex, bool)
-	AddIndex(idx IdentifiableIndex) error
+	CreateIndex(idx IdentifiableIndex) error
 	DeleteIndex(id string) error
 }
 
@@ -28,8 +28,8 @@ type InMemoryIndexRepo struct {
 	indexes *sync.Map
 }
 
-func NewInMemoryIndexRepo() InMemoryIndexRepo {
-	return InMemoryIndexRepo{indexes: &sync.Map{}}
+func NewInMemoryIndexRepo() *InMemoryIndexRepo {
+	return &InMemoryIndexRepo{indexes: &sync.Map{}}
 }
 
 func (r *InMemoryIndexRepo) GetIndexes() (list []IdentifiableIndex) {
