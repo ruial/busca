@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +10,7 @@ import (
 	"github.com/ruial/busca/pkg/analysis"
 	"github.com/ruial/busca/pkg/core"
 	"github.com/ruial/busca/pkg/index"
+	"github.com/ruial/busca/pkg/search"
 )
 
 type IndexCtrl struct {
@@ -29,9 +31,41 @@ type DocumentUpdateDTO struct {
 	Text string `json:"text" binding:"required"`
 }
 
+type SearchInputDTO struct {
+	Query     string
+	Filter    string
+	MinMatch  string `json:"min_match"`
+	TfWeight  string `json:"tf_weight"`
+	IdfWeight string `json:"idf_weight"`
+}
+
+type DocumentScoreDTO struct {
+	ID    string  `json:"id"`
+	Score float64 `json:"score"`
+}
+type SearchOutputDTO struct {
+	Docs []DocumentScoreDTO `json:"docs"`
+	Size int                `json:"size"`
+}
+
 var analyzers = map[string]analysis.Analyzer{
-	analysis.SimpleAnalyzer.String():     analysis.SimpleAnalyzer,
+	analysis.StandardAnalyzer.String():   analysis.StandardAnalyzer,
 	analysis.WhiteSpaceAnalyzer.String(): analysis.WhiteSpaceAnalyzer,
+}
+
+var filters = map[string]search.Filter{
+	"and": search.AndFilter,
+	"or":  search.OrFilter,
+}
+
+var tfWeights = map[string]search.TfWeightScheme{
+	"default": search.TfWeightDefault,
+	"log":     search.TfWeightLog,
+}
+
+var idfWeights = map[string]search.IdfWeightScheme{
+	"default": search.IdfWeightDefault,
+	"smooth":  search.IdfWeightSmooth,
 }
 
 func (ic IndexCtrl) index(c *gin.Context) *index.Index {
@@ -138,4 +172,61 @@ func (ic IndexCtrl) DeleteDocument(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
+	dto := SearchInputDTO{
+		Filter:    "or",
+		TfWeight:  "default",
+		IdfWeight: "default",
+	}
+	if c.Request.Method == http.MethodGet {
+		dto.Query = c.Query("query")
+		dto.Filter = c.DefaultQuery("filter", dto.Filter)
+		dto.MinMatch = c.Query("min_match")
+		dto.TfWeight = c.DefaultQuery("tf_weight", dto.TfWeight)
+		dto.IdfWeight = c.DefaultQuery("idf_weight", dto.IdfWeight)
+	} else {
+		if err := c.ShouldBindJSON(&dto); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	filter, ok := filters[dto.Filter]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter"})
+		return
+	}
+
+	if dto.MinMatch != "" {
+		minMatch, err := strconv.Atoi(dto.MinMatch)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid min_match"})
+			return
+		}
+		filter = search.MinMatchFilter(minMatch)
+	}
+
+	tfWeight, ok := tfWeights[dto.TfWeight]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tf weight"})
+		return
+	}
+	idfWeight, ok := idfWeights[dto.IdfWeight]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid idf weight"})
+		return
+	}
+
+	ranker := search.TfIdfRanker(tfWeight, idfWeight)
+	idx := ic.index(c)
+	docs := idx.SearchDocuments(dto.Query, filter, ranker)
+
+	docsDto := make([]DocumentScoreDTO, 0, len(docs))
+	for _, res := range docs {
+		docsDto = append(docsDto, DocumentScoreDTO{ID: res.Doc.ID(), Score: res.Score})
+	}
+
+	c.JSON(http.StatusOK, SearchOutputDTO{Docs: docsDto, Size: len(docs)})
 }

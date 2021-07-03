@@ -25,11 +25,11 @@ type IndexRepo interface {
 }
 
 type InMemoryIndexRepo struct {
-	indexes *sync.Map
+	indexes sync.Map
 }
 
 func NewInMemoryIndexRepo() *InMemoryIndexRepo {
-	return &InMemoryIndexRepo{indexes: &sync.Map{}}
+	return &InMemoryIndexRepo{}
 }
 
 func (r *InMemoryIndexRepo) GetIndexes() (list []IdentifiableIndex) {

@@ -13,8 +13,8 @@ type Document interface {
 }
 
 type BaseDocument struct {
-	Name    DocumentID
-	Content string
+	Name    DocumentID `json:"id"`
+	Content string     `json:"text"`
 }
 
 func NewBaseDocument(id DocumentID, text string) BaseDocument {

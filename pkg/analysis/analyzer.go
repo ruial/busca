@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	SimpleAnalyzer     = simpleAnalyzer{}
+	StandardAnalyzer   = standardAnalyzer{}
 	WhiteSpaceAnalyzer = whitespaceAnalyzer{}
 )
 
@@ -15,17 +15,18 @@ type Analyzer interface {
 	String() string
 }
 
-type simpleAnalyzer struct{}
+type standardAnalyzer struct{}
 
-func (s simpleAnalyzer) Analyze(text string) []string {
+func (s standardAnalyzer) Analyze(text string) []string {
 	// faster than regex.Split
+	// analyzer steps - character filters > tokenizer > token filters
 	return strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
-		return !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == rune('\''))
+		return !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == rune('\'') || r == rune('’'))
 	})
 }
 
-func (s simpleAnalyzer) String() string {
-	return "SimpleAnalyzer"
+func (s standardAnalyzer) String() string {
+	return "StandardAnalyzer"
 }
 
 type whitespaceAnalyzer struct{}

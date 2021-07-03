@@ -15,7 +15,7 @@ func TestExportImport(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 	out := "../../test/testdata/index.out"
-	analyzer := analysis.SimpleAnalyzer
+	analyzer := analysis.StandardAnalyzer
 	idx, _ := LoadDocuments("../../test/testdata/books", analyzer)
 	Export(idx, out)
 	idx2, _ := Import(out)

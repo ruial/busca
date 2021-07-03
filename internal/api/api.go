@@ -26,15 +26,18 @@ func Server(addr string, indexRepository repository.IndexRepo) error {
 	indexController := controller.IndexCtrl{IndexRepository: indexRepository}
 	indexExistsMiddleware := indexExists(indexController)
 
-	router.GET("/index", indexController.GetIndexes)
-	router.POST("/index", indexController.CreateIndex)
-	router.GET("/index/:id", indexExistsMiddleware, indexController.GetIndex)
-	router.DELETE("/index/:id", indexExistsMiddleware, indexController.DeleteIndex)
+	router.GET("/indexes", indexController.GetIndexes)
+	router.POST("/indexes", indexController.CreateIndex)
+	router.GET("/indexes/:id", indexExistsMiddleware, indexController.GetIndex)
+	router.DELETE("/indexes/:id", indexExistsMiddleware, indexController.DeleteIndex)
 
-	router.POST("/index/:id/", indexExistsMiddleware, indexController.CreateDocument)
-	router.GET("/index/:id/:docId", indexExistsMiddleware, indexController.GetDocument)
-	router.PUT("/index/:id/:docId", indexExistsMiddleware, indexController.UpdateDocument)
-	router.DELETE("/index/:id/:docId", indexExistsMiddleware, indexController.DeleteDocument)
+	router.GET("/indexes/:id/_search", indexExistsMiddleware, indexController.SearchDocuments)
+	router.POST("/indexes/:id/_search", indexExistsMiddleware, indexController.SearchDocuments)
+
+	router.POST("/indexes/:id/docs", indexExistsMiddleware, indexController.CreateDocument)
+	router.GET("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.GetDocument)
+	router.PUT("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.UpdateDocument)
+	router.DELETE("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.DeleteDocument)
 
 	return router.Run(addr)
 }
