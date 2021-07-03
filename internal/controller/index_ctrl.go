@@ -17,9 +17,15 @@ type IndexCtrl struct {
 	IndexRepository repository.IndexRepo
 }
 
-type IndexDTO struct {
+type IndexInputDTO struct {
 	ID       string `json:"id" binding:"required"`
 	Analyzer string `json:"analyzer" binding:"required"`
+}
+
+type IndexOutputDTO struct {
+	ID       string `json:"id"`
+	Analyzer string `json:"analyzer"`
+	Docs     int    `json:"docs"`
 }
 
 type DocumentDTO struct {
@@ -32,17 +38,20 @@ type DocumentUpdateDTO struct {
 }
 
 type SearchInputDTO struct {
-	Query     string
-	Filter    string
-	MinMatch  string `json:"min_match"`
-	TfWeight  string `json:"tf_weight"`
-	IdfWeight string `json:"idf_weight"`
+	Query       string
+	Filter      string
+	MinMatch    string `json:"min_match"`
+	TfWeight    string `json:"tf_weight"`
+	IdfWeight   string `json:"idf_weight"`
+	IncludeText bool   `json:"include_text"`
 }
 
 type DocumentScoreDTO struct {
 	ID    string  `json:"id"`
+	Text  string  `json:",omitempty"`
 	Score float64 `json:"score"`
 }
+
 type SearchOutputDTO struct {
 	Docs []DocumentScoreDTO `json:"docs"`
 	Size int                `json:"size"`
@@ -74,7 +83,7 @@ func (ic IndexCtrl) index(c *gin.Context) *index.Index {
 }
 
 func (ic IndexCtrl) CreateIndex(c *gin.Context) {
-	var json IndexDTO
+	var json IndexInputDTO
 	if err := c.ShouldBindJSON(&json); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -96,7 +105,8 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 
 func (ic IndexCtrl) GetIndex(c *gin.Context) {
 	idx := ic.index(c)
-	c.JSON(http.StatusOK, IndexDTO{ID: c.Param("id"), Analyzer: idx.GetAnalyzer()})
+	c.JSON(http.StatusOK,
+		IndexOutputDTO{ID: c.Param("id"), Analyzer: idx.GetAnalyzer(), Docs: idx.Length()})
 }
 
 func (ic IndexCtrl) DeleteIndex(c *gin.Context) {
@@ -107,11 +117,12 @@ func (ic IndexCtrl) DeleteIndex(c *gin.Context) {
 }
 
 func (ic IndexCtrl) GetIndexes(c *gin.Context) {
-	idxs := ic.IndexRepository.GetIndexes()
-	list := make([]IndexDTO, 0, len(idxs))
+	indexes := ic.IndexRepository.GetIndexes()
+	list := make([]IndexOutputDTO, 0, len(indexes))
 
-	for _, idx := range idxs {
-		list = append(list, IndexDTO{ID: idx.ID, Analyzer: idx.Index.GetAnalyzer()})
+	for _, idx := range indexes {
+		outputDto := IndexOutputDTO{ID: idx.ID, Analyzer: idx.Index.GetAnalyzer(), Docs: idx.Index.Length()}
+		list = append(list, outputDto)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"indexes": list})
@@ -175,32 +186,36 @@ func (ic IndexCtrl) DeleteDocument(c *gin.Context) {
 }
 
 func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
-	dto := SearchInputDTO{
-		Filter:    "or",
-		TfWeight:  "default",
-		IdfWeight: "default",
+	inputDto := SearchInputDTO{
+		Filter:      "or",
+		TfWeight:    "default",
+		IdfWeight:   "default",
+		IncludeText: true,
 	}
 	if c.Request.Method == http.MethodGet {
-		dto.Query = c.Query("query")
-		dto.Filter = c.DefaultQuery("filter", dto.Filter)
-		dto.MinMatch = c.Query("min_match")
-		dto.TfWeight = c.DefaultQuery("tf_weight", dto.TfWeight)
-		dto.IdfWeight = c.DefaultQuery("idf_weight", dto.IdfWeight)
+		inputDto.Query = c.Query("query")
+		inputDto.Filter = c.DefaultQuery("filter", inputDto.Filter)
+		inputDto.MinMatch = c.Query("min_match")
+		inputDto.TfWeight = c.DefaultQuery("tf_weight", inputDto.TfWeight)
+		inputDto.IdfWeight = c.DefaultQuery("idf_weight", inputDto.IdfWeight)
+		if strings.ToLower(c.Query("include_text")) == "false" {
+			inputDto.IncludeText = false
+		}
 	} else {
-		if err := c.ShouldBindJSON(&dto); err != nil {
+		if err := c.ShouldBindJSON(&inputDto); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 	}
 
-	filter, ok := filters[dto.Filter]
+	filter, ok := filters[inputDto.Filter]
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter"})
 		return
 	}
 
-	if dto.MinMatch != "" {
-		minMatch, err := strconv.Atoi(dto.MinMatch)
+	if inputDto.MinMatch != "" {
+		minMatch, err := strconv.Atoi(inputDto.MinMatch)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid min_match"})
 			return
@@ -208,12 +223,12 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 		filter = search.MinMatchFilter(minMatch)
 	}
 
-	tfWeight, ok := tfWeights[dto.TfWeight]
+	tfWeight, ok := tfWeights[inputDto.TfWeight]
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tf weight"})
 		return
 	}
-	idfWeight, ok := idfWeights[dto.IdfWeight]
+	idfWeight, ok := idfWeights[inputDto.IdfWeight]
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid idf weight"})
 		return
@@ -221,11 +236,15 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 
 	ranker := search.TfIdfRanker(tfWeight, idfWeight)
 	idx := ic.index(c)
-	docs := idx.SearchDocuments(dto.Query, filter, ranker)
+	docs := idx.SearchDocuments(inputDto.Query, filter, ranker)
 
 	docsDto := make([]DocumentScoreDTO, 0, len(docs))
 	for _, res := range docs {
-		docsDto = append(docsDto, DocumentScoreDTO{ID: res.Doc.ID(), Score: res.Score})
+		docDto := DocumentScoreDTO{ID: res.Doc.ID(), Score: res.Score}
+		if inputDto.IncludeText {
+			docDto.Text = res.Doc.Text()
+		}
+		docsDto = append(docsDto, docDto)
 	}
 
 	c.JSON(http.StatusOK, SearchOutputDTO{Docs: docsDto, Size: len(docs)})
