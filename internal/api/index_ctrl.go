@@ -77,9 +77,9 @@ var idfWeights = map[string]search.IdfWeightScheme{
 	"smooth":  search.IdfWeightSmooth,
 }
 
-func (ic IndexCtrl) index(c *gin.Context) *index.Index {
+func (ic IndexCtrl) index(c *gin.Context) repository.IdentifiableIndex {
 	idx, _ := c.Get("index")
-	return idx.(*index.Index)
+	return idx.(repository.IdentifiableIndex)
 }
 
 func (ic IndexCtrl) CreateIndex(c *gin.Context) {
@@ -104,7 +104,7 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 }
 
 func (ic IndexCtrl) GetIndex(c *gin.Context) {
-	idx := ic.index(c)
+	idx := ic.index(c).Index
 	c.JSON(http.StatusOK,
 		IndexOutputDTO{ID: c.Param("id"), Analyzer: idx.GetAnalyzer(), Docs: idx.Length()})
 }
@@ -136,8 +136,12 @@ func (ic IndexCtrl) CreateDocument(c *gin.Context) {
 	}
 
 	idx := ic.index(c)
-	if err := idx.AddDocument(core.NewBaseDocument(json.ID, json.Text)); err != nil {
+	if err := idx.Index.AddDocument(core.NewBaseDocument(json.ID, json.Text)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, json)
@@ -145,7 +149,7 @@ func (ic IndexCtrl) CreateDocument(c *gin.Context) {
 
 func (ic IndexCtrl) GetDocument(c *gin.Context) {
 	idx := ic.index(c)
-	doc := idx.GetDocument(c.Param("docId"))
+	doc := idx.Index.GetDocument(c.Param("docId"))
 	if doc == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": index.ErrNonExistentDocument.Error()})
 		return
@@ -161,15 +165,19 @@ func (ic IndexCtrl) UpdateDocument(c *gin.Context) {
 	}
 
 	idx := ic.index(c)
-	updateFunction := idx.UpdateDocument
+	updateFunction := idx.Index.UpdateDocument
 	upsert := strings.ToLower(c.Query("upsert"))
 	if upsert == "true" {
-		updateFunction = idx.UpsertDocument
+		updateFunction = idx.Index.UpsertDocument
 	}
 
 	doc := core.NewBaseDocument(c.Param("docId"), json.Text)
 	if err := updateFunction(doc); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -178,8 +186,12 @@ func (ic IndexCtrl) UpdateDocument(c *gin.Context) {
 
 func (ic IndexCtrl) DeleteDocument(c *gin.Context) {
 	idx := ic.index(c)
-	if err := idx.DeleteDocument(c.Param("docId")); err != nil {
+	if err := idx.Index.DeleteDocument(c.Param("docId")); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -195,12 +207,15 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 	if c.Request.Method == http.MethodGet {
 		inputDto.Query = c.Query("query")
 		inputDto.Filter = c.DefaultQuery("filter", inputDto.Filter)
-		minMatch, err := strconv.Atoi(c.DefaultQuery("min_match", strconv.Itoa(*inputDto.MinMatch)))
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid min_match"})
-			return
+		minMatchStr := c.Query("min_match")
+		if minMatchStr != "" {
+			minMatch, err := strconv.Atoi(minMatchStr)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid min_match"})
+				return
+			}
+			inputDto.MinMatch = &minMatch
 		}
-		inputDto.MinMatch = &minMatch
 		inputDto.TfWeight = c.DefaultQuery("tf_weight", inputDto.TfWeight)
 		inputDto.IdfWeight = c.DefaultQuery("idf_weight", inputDto.IdfWeight)
 		if strings.ToLower(c.Query("include_text")) == "false" {
@@ -235,7 +250,7 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 	}
 
 	ranker := search.TfIdfRanker(tfWeight, idfWeight)
-	idx := ic.index(c)
+	idx := ic.index(c).Index
 	docs := idx.SearchDocuments(inputDto.Query, filter, ranker)
 
 	docsDto := make([]DocumentScoreDTO, 0, len(docs))

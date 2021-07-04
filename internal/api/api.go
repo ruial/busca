@@ -15,11 +15,11 @@ func indexExists(ic IndexCtrl) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": repository.ErrIndexDoesNotExist.Error()})
 			return
 		}
-		c.Set("index", idx.Index)
+		c.Set("index", idx)
 	}
 }
 
-func setupRouter(indexRepository repository.IndexRepo) *gin.Engine {
+func SetupRouter(indexRepository repository.IndexRepo) *gin.Engine {
 	router := gin.Default()
 
 	indexController := IndexCtrl{IndexRepository: indexRepository}
@@ -39,9 +39,4 @@ func setupRouter(indexRepository repository.IndexRepo) *gin.Engine {
 	router.DELETE("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.DeleteDocument)
 
 	return router
-}
-
-func Server(addr string, indexRepository repository.IndexRepo) error {
-	router := setupRouter(indexRepository)
-	return router.Run(addr)
 }

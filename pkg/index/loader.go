@@ -13,11 +13,11 @@ import (
 	"github.com/ruial/busca/pkg/core"
 )
 
-type gobber struct {
+type Gobber struct {
 	index *Index
 }
 
-func (g *gobber) GobEncode() ([]byte, error) {
+func (g *Gobber) GobEncode() ([]byte, error) {
 	g.index.docsMutex.Lock()
 	defer g.index.docsMutex.Unlock()
 	w := new(bytes.Buffer)
@@ -34,7 +34,7 @@ func (g *gobber) GobEncode() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-func (g *gobber) GobDecode(buf []byte) error {
+func (g *Gobber) GobDecode(buf []byte) error {
 	g.index.docsMutex.Lock()
 	defer g.index.docsMutex.Unlock()
 	r := bytes.NewBuffer(buf)
@@ -86,7 +86,7 @@ func Import(path string) (*Index, error) {
 	}
 	defer file.Close()
 	decoder := gob.NewDecoder(file)
-	g := &gobber{index: &Index{}}
+	g := &Gobber{index: &Index{}}
 	err = decoder.Decode(g)
 	return g.index, err
 }
@@ -98,7 +98,7 @@ func Export(index *Index, path string) error {
 	}
 	defer file.Close()
 	encoder := gob.NewEncoder(file)
-	g := &gobber{index: index}
+	g := &Gobber{index: index}
 	if err = encoder.Encode(g); err != nil {
 		return err
 	}

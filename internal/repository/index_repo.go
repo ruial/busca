@@ -22,6 +22,7 @@ type IndexRepo interface {
 	GetIndex(id string) (IdentifiableIndex, bool)
 	CreateIndex(idx IdentifiableIndex) error
 	DeleteIndex(id string) error
+	UpdateIndex(idx IdentifiableIndex) error
 }
 
 type InMemoryIndexRepo struct {
@@ -61,5 +62,10 @@ func (r *InMemoryIndexRepo) DeleteIndex(id string) error {
 	if !ok {
 		return ErrIndexDoesNotExist
 	}
+	return nil
+}
+
+func (r *InMemoryIndexRepo) UpdateIndex(idx IdentifiableIndex) error {
+	// as index is a pointer, this is is a no-op
 	return nil
 }

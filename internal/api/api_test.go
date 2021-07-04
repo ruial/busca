@@ -22,7 +22,7 @@ func init() {
 	index := index.New(analysis.StandardAnalyzer)
 	index.AddDocument(core.NewBaseDocument("doc1", "sample document"))
 	indexRepo.CreateIndex(repository.IdentifiableIndex{ID: "test", Index: index})
-	router = setupRouter(indexRepo)
+	router = SetupRouter(indexRepo)
 }
 
 func TestCreateIndex(t *testing.T) {
