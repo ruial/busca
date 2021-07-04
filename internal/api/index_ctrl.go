@@ -1,4 +1,4 @@
-package controller
+package api
 
 import (
 	"net/http"
@@ -40,7 +40,7 @@ type DocumentUpdateDTO struct {
 type SearchInputDTO struct {
 	Query       string
 	Filter      string
-	MinMatch    string `json:"min_match"`
+	MinMatch    *int   `json:"min_match"`
 	TfWeight    string `json:"tf_weight"`
 	IdfWeight   string `json:"idf_weight"`
 	IncludeText bool   `json:"include_text"`
@@ -48,7 +48,7 @@ type SearchInputDTO struct {
 
 type DocumentScoreDTO struct {
 	ID    string  `json:"id"`
-	Text  string  `json:",omitempty"`
+	Text  string  `json:"text,omitempty"`
 	Score float64 `json:"score"`
 }
 
@@ -59,7 +59,7 @@ type SearchOutputDTO struct {
 
 var analyzers = map[string]analysis.Analyzer{
 	analysis.StandardAnalyzer.String():   analysis.StandardAnalyzer,
-	analysis.WhiteSpaceAnalyzer.String(): analysis.WhiteSpaceAnalyzer,
+	analysis.WhitespaceAnalyzer.String(): analysis.WhitespaceAnalyzer,
 }
 
 var filters = map[string]search.Filter{
@@ -147,7 +147,7 @@ func (ic IndexCtrl) GetDocument(c *gin.Context) {
 	idx := ic.index(c)
 	doc := idx.GetDocument(c.Param("docId"))
 	if doc == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": index.ErrNonExistentDocument.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": index.ErrNonExistentDocument.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, DocumentDTO{ID: doc.ID(), Text: doc.Text()})
@@ -169,7 +169,7 @@ func (ic IndexCtrl) UpdateDocument(c *gin.Context) {
 
 	doc := core.NewBaseDocument(c.Param("docId"), json.Text)
 	if err := updateFunction(doc); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -195,7 +195,12 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 	if c.Request.Method == http.MethodGet {
 		inputDto.Query = c.Query("query")
 		inputDto.Filter = c.DefaultQuery("filter", inputDto.Filter)
-		inputDto.MinMatch = c.Query("min_match")
+		minMatch, err := strconv.Atoi(c.DefaultQuery("min_match", strconv.Itoa(*inputDto.MinMatch)))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid min_match"})
+			return
+		}
+		inputDto.MinMatch = &minMatch
 		inputDto.TfWeight = c.DefaultQuery("tf_weight", inputDto.TfWeight)
 		inputDto.IdfWeight = c.DefaultQuery("idf_weight", inputDto.IdfWeight)
 		if strings.ToLower(c.Query("include_text")) == "false" {
@@ -213,14 +218,9 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter"})
 		return
 	}
-
-	if inputDto.MinMatch != "" {
-		minMatch, err := strconv.Atoi(inputDto.MinMatch)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid min_match"})
-			return
-		}
-		filter = search.MinMatchFilter(minMatch)
+	// if minMatch is defined and it is <= 0, filter will get all documents
+	if inputDto.MinMatch != nil {
+		filter = search.MinMatchFilter(*inputDto.MinMatch)
 	}
 
 	tfWeight, ok := tfWeights[inputDto.TfWeight]

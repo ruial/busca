@@ -4,11 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ruial/busca/internal/controller"
 	"github.com/ruial/busca/internal/repository"
 )
 
-func indexExists(ic controller.IndexCtrl) gin.HandlerFunc {
+func indexExists(ic IndexCtrl) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		idx, exists := ic.IndexRepository.GetIndex(id)
@@ -20,10 +19,10 @@ func indexExists(ic controller.IndexCtrl) gin.HandlerFunc {
 	}
 }
 
-func Server(addr string, indexRepository repository.IndexRepo) error {
+func setupRouter(indexRepository repository.IndexRepo) *gin.Engine {
 	router := gin.Default()
 
-	indexController := controller.IndexCtrl{IndexRepository: indexRepository}
+	indexController := IndexCtrl{IndexRepository: indexRepository}
 	indexExistsMiddleware := indexExists(indexController)
 
 	router.GET("/indexes", indexController.GetIndexes)
@@ -39,5 +38,10 @@ func Server(addr string, indexRepository repository.IndexRepo) error {
 	router.PUT("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.UpdateDocument)
 	router.DELETE("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.DeleteDocument)
 
+	return router
+}
+
+func Server(addr string, indexRepository repository.IndexRepo) error {
+	router := setupRouter(indexRepository)
 	return router.Run(addr)
 }

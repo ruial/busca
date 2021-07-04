@@ -155,3 +155,18 @@ func (i *Index) SearchDocuments(query string, filterFn search.Filter, rankFn sea
 	}
 	return
 }
+
+func (i *Index) Clone() *Index {
+	i.docsMutex.Lock()
+	defer i.docsMutex.Unlock()
+	clone := New(i.analyzer)
+	for k, v := range i.terms {
+		clone.terms[k] = make([]core.DocumentID, len(v))
+		copy(clone.terms[k], v)
+	}
+	for k, v := range i.documents {
+		// no need to copy as the value is not a pointer
+		clone.documents[k] = v
+	}
+	return clone
+}

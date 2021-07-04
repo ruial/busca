@@ -85,6 +85,24 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestClone(t *testing.T) {
+	idx := New(analysis.StandardAnalyzer)
+	idx.AddDocument(core.NewBaseDocument("id", "my text"))
+	clone := idx.Clone()
+	idx.AddDocument(core.NewBaseDocument("id2", "another text"))
+	if clone.Length() == idx.Length() {
+		t.Error("Documents should be a copy")
+	}
+	idx.terms["my"][0] = "edit"
+	if clone.terms["my"][0] == "edit" {
+		t.Error("Terms array should be a copy")
+	}
+	idx.analyzer = analysis.WhitespaceAnalyzer
+	if clone.GetAnalyzer() == idx.GetAnalyzer() {
+		t.Error("Analyzer should be a copy")
+	}
+}
+
 func TestAddDeleteConcurrent(t *testing.T) {
 	idx := New(analysis.StandardAnalyzer)
 	// repeat some document ids to simulate collisions

@@ -19,10 +19,3 @@ func TestTopTerms(t *testing.T) {
 		t.Error("Invalid top terms length:", top)
 	}
 }
-
-func TestBaseDocument(t *testing.T) {
-	doc := NewBaseDocument("1", "test document")
-	if doc.ID() != "1" || doc.Text() != "test document" {
-		t.Error("Base document does not implement interface")
-	}
-}

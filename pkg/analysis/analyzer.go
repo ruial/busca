@@ -7,7 +7,7 @@ import (
 
 var (
 	StandardAnalyzer   = standardAnalyzer{}
-	WhiteSpaceAnalyzer = whitespaceAnalyzer{}
+	WhitespaceAnalyzer = whitespaceAnalyzer{}
 )
 
 type Analyzer interface {
@@ -36,5 +36,5 @@ func (w whitespaceAnalyzer) Analyze(text string) []string {
 }
 
 func (w whitespaceAnalyzer) String() string {
-	return "WhiteSpaceAnalyzer"
+	return "WhitespaceAnalyzer"
 }
