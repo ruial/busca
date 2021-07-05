@@ -4,56 +4,31 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/ruial/busca/internal/api"
 	"github.com/ruial/busca/internal/repository"
-	"github.com/ruial/busca/pkg/index"
 )
 
-const indexExtension = ".out"
-
-func exportIndexRepo(dir string, indexRepo repository.IndexRepo) {
+func exportIndexRepo(indexRepo repository.IndexRepo) {
 	log.Println("Exporting index")
 	start := time.Now()
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		if err := os.Mkdir(dir, 0700); err != nil {
-			log.Println("Error creating export directory:", err)
-
-		}
-	}
-	for _, idx := range indexRepo.GetIndexes() {
-		out := path.Join(dir, idx.ID+indexExtension)
-		// cloning is faster than serializing, so lock time is reduced for readers
-		if err := index.Export(idx.Index.Clone(), out); err != nil {
-			log.Printf("Error exporting index %s: %s", idx.ID, err.Error())
-		}
+	if err := indexRepo.SnapshotExport(); err != nil {
+		log.Println(err)
 	}
 	log.Println("Elapsed exporting:", time.Now().Sub(start))
 }
 
-func importIndexRepo(dir string, indexRepo repository.IndexRepo) {
+func importIndexRepo(indexRepo repository.IndexRepo) {
 	log.Println("Importing index")
 	start := time.Now()
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		log.Println("Error reading directory:", err)
-	}
-	for _, file := range files {
-		id := strings.TrimSuffix(file.Name(), indexExtension)
-		idx, err := index.Import(path.Join(dir, file.Name()))
-		if err != nil {
-			log.Printf("Error importing index %s: %s", id, err.Error())
-		}
-		indexRepo.CreateIndex(repository.IdentifiableIndex{ID: id, Index: idx})
+	if err := indexRepo.SnapshotImport(); err != nil {
+		log.Println(err)
 	}
 	log.Println("Elapsed importing:", time.Now().Sub(start))
 }
@@ -80,10 +55,12 @@ func main() {
 		snapshotIntervalDuration = duration
 	}
 
-	indexRepo := repository.NewInMemoryIndexRepo()
-	if *dataDir != "" {
-		importIndexRepo(*dataDir, indexRepo)
+	var indexRepo repository.IndexRepo
+	indexRepo = &repository.LocalIndexRepo{
+		SnapshotDir:      *dataDir,
+		SnapshotInterval: snapshotIntervalDuration,
 	}
+	importIndexRepo(indexRepo)
 
 	addr := *address + ":" + *port
 	router := api.SetupRouter(indexRepo)
@@ -103,7 +80,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	done := make(chan struct{})
-	if *snapshotInterval != "" {
+	if indexRepo.IsSnapshotEnabled() {
 		wg.Add(1)
 		ticker := time.NewTicker(snapshotIntervalDuration)
 		defer ticker.Stop()
@@ -111,10 +88,10 @@ func main() {
 			for {
 				select {
 				case <-ticker.C:
-					exportIndexRepo(*dataDir, indexRepo)
+					exportIndexRepo(indexRepo)
 				case <-done:
 					log.Println("Stopping snapshots")
-					exportIndexRepo(*dataDir, indexRepo)
+					exportIndexRepo(indexRepo)
 					wg.Done()
 					return
 				}

@@ -1,5 +1,4 @@
-// Package test contains test utils
-package test
+package util
 
 import "sort"
 

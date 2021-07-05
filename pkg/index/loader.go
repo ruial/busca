@@ -3,7 +3,6 @@ package index
 import (
 	"bytes"
 	"encoding/gob"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -49,7 +48,7 @@ func (g *Gobber) GobDecode(buf []byte) error {
 }
 
 func loadFile(idx *Index, filePath string) error {
-	bytes, err := ioutil.ReadFile(filePath)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -59,7 +58,7 @@ func loadFile(idx *Index, filePath string) error {
 }
 
 func LoadDocuments(dir string, analyzer analysis.Analyzer) (*Index, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -67,11 +66,13 @@ func LoadDocuments(dir string, analyzer analysis.Analyzer) (*Index, error) {
 	var wg sync.WaitGroup
 	for _, file := range files {
 		wg.Add(1)
-		go func(file os.FileInfo) {
+		go func(file os.DirEntry) {
 			defer wg.Done()
-			filePath := path.Join(dir, file.Name())
-			if err := loadFile(idx, filePath); err != nil {
-				log.Printf("Unable to read file %s: %s", filePath, err.Error())
+			if !file.IsDir() {
+				filePath := path.Join(dir, file.Name())
+				if err := loadFile(idx, filePath); err != nil {
+					log.Printf("Unable to read file %s: %s", filePath, err.Error())
+				}
 			}
 		}(file)
 	}

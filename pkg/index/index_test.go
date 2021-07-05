@@ -1,8 +1,9 @@
 package index
 
 import (
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestAdd(t *testing.T) {
 	if err := idx.AddDocument(doc); err != nil {
 		t.Error("First document should not throw error")
 	}
-	if err := idx.AddDocument(doc); err != ErrDuplicateDocument {
+	if err := idx.AddDocument(doc); !errors.Is(err, ErrDuplicateDocument) {
 		t.Error("Duplicate should throw error")
 	}
 	if length := idx.Length(); length != 1 {
@@ -31,7 +32,7 @@ func TestAdd(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	idx := New(analysis.StandardAnalyzer)
 	doc := core.NewBaseDocument("id", "text")
-	if err := idx.UpdateDocument(doc); err != ErrNonExistentDocument {
+	if err := idx.UpdateDocument(doc); !errors.Is(err, ErrNonExistentDocument) {
 		t.Error("Update non existing throw error")
 	}
 	idx.AddDocument(doc)
@@ -74,7 +75,7 @@ func TestDelete(t *testing.T) {
 		t.Error("Should not throw error on deleting valid document")
 	}
 	err = idx.DeleteDocument(doc.ID())
-	if err != ErrNonExistentDocument {
+	if !errors.Is(err, ErrNonExistentDocument) {
 		t.Error("Should throw error on deleting non existent document")
 	}
 	if idx.GetDocument(doc.ID()) != nil {
@@ -176,7 +177,7 @@ func TestSearch(t *testing.T) {
 
 func BenchmarkAdd(b *testing.B) {
 	idx := New(analysis.StandardAnalyzer)
-	bytes, err := ioutil.ReadFile("../../test/testdata/books/Dracula.txt")
+	bytes, err := os.ReadFile("../../testdata/books/Dracula.txt")
 	if err != nil {
 		b.Error("File not found")
 	}

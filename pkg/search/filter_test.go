@@ -3,8 +3,8 @@ package search
 import (
 	"testing"
 
+	"github.com/ruial/busca/internal/util"
 	"github.com/ruial/busca/pkg/core"
-	"github.com/ruial/busca/test"
 )
 
 func TestOrFilter(t *testing.T) {
@@ -25,7 +25,7 @@ func TestOrFilter(t *testing.T) {
 		{[]string{"none"}, []string{}},
 	} {
 		resultIds := OrFilter(c.searchTerms, docTerms)
-		if !test.StringArrayEquals(resultIds, c.docIds, false) {
+		if !util.StringArrayEquals(resultIds, c.docIds, false) {
 			t.Errorf("Bad results for %s: %s\n", c.searchTerms, resultIds)
 		}
 	}
@@ -48,7 +48,7 @@ func TestAndFilter(t *testing.T) {
 		{[]string{"the", "last"}, []string{}},
 	} {
 		resultIds := AndFilter(c.searchTerms, docTerms)
-		if !test.StringArrayEquals(resultIds, c.docIds, false) {
+		if !util.StringArrayEquals(resultIds, c.docIds, false) {
 			t.Errorf("Bad results for %s: %s\n", c.searchTerms, resultIds)
 		}
 	}

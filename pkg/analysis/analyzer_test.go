@@ -3,7 +3,7 @@ package analysis
 import (
 	"testing"
 
-	"github.com/ruial/busca/test"
+	"github.com/ruial/busca/internal/util"
 )
 
 func TestStandardAnalyzer(t *testing.T) {
@@ -13,7 +13,7 @@ func TestStandardAnalyzer(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("Length: %d - %d, Analyzer results is not expected:\n%s\n%s\n", len(result), len(expected), result, expected)
 	}
-	if !test.StringArrayEquals(result, expected, true) {
+	if !util.StringArrayEquals(result, expected, true) {
 		t.Error("Analyzer result not equal to expected:", result)
 	}
 }
@@ -25,7 +25,7 @@ func TestWhitespaceAnalyzer(t *testing.T) {
 	if len(result) != len(expected) {
 		t.Errorf("Length: %d - %d, Analyzer results is not expected:\n%s\n%s\n", len(result), len(expected), result, expected)
 	}
-	if !test.StringArrayEquals(result, expected, true) {
+	if !util.StringArrayEquals(result, expected, true) {
 		t.Error("Analyzer result not equal to expected:", result)
 	}
 }

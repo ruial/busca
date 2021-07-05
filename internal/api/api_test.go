@@ -18,7 +18,7 @@ import (
 var router *gin.Engine
 
 func init() {
-	indexRepo := repository.NewInMemoryIndexRepo()
+	indexRepo := &repository.LocalIndexRepo{}
 	index := index.New(analysis.StandardAnalyzer)
 	index.AddDocument(core.NewBaseDocument("doc1", "sample document"))
 	indexRepo.CreateIndex(repository.IdentifiableIndex{ID: "test", Index: index})

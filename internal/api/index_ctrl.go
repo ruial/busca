@@ -95,7 +95,12 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 		return
 	}
 
-	idx := repository.IdentifiableIndex{ID: json.ID, Index: index.New(analyzer)}
+	idx, err := repository.NewIdentifiableIndex(json.ID, index.New(analyzer))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	if err := ic.IndexRepository.CreateIndex(idx); err != nil {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
@@ -112,6 +117,7 @@ func (ic IndexCtrl) GetIndex(c *gin.Context) {
 func (ic IndexCtrl) DeleteIndex(c *gin.Context) {
 	if err := ic.IndexRepository.DeleteIndex(c.Param("id")); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
 	}
 	c.Status(http.StatusNoContent)
 }
@@ -138,10 +144,6 @@ func (ic IndexCtrl) CreateDocument(c *gin.Context) {
 	idx := ic.index(c)
 	if err := idx.Index.AddDocument(core.NewBaseDocument(json.ID, json.Text)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, json)
@@ -176,11 +178,6 @@ func (ic IndexCtrl) UpdateDocument(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
 	c.JSON(http.StatusOK, DocumentDTO{ID: doc.ID(), Text: doc.Text()})
 }
 
@@ -188,10 +185,6 @@ func (ic IndexCtrl) DeleteDocument(c *gin.Context) {
 	idx := ic.index(c)
 	if err := idx.Index.DeleteDocument(c.Param("docId")); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.Status(http.StatusNoContent)

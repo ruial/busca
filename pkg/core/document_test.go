@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/ruial/busca/test"
+	"github.com/ruial/busca/internal/util"
 )
 
 func TestTopTerms(t *testing.T) {
@@ -11,7 +11,7 @@ func TestTopTerms(t *testing.T) {
 	expected := []string{"test3", "some2", "query1"}
 	tf := NewTermFrequency(query)
 	top := tf.Top(20)
-	if !test.StringArrayEquals(top, expected, true) {
+	if !util.StringArrayEquals(top, expected, true) {
 		t.Error("Invalid top terms:", top, expected)
 	}
 	top = tf.Top(2)
