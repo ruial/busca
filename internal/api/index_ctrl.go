@@ -18,14 +18,18 @@ type IndexCtrl struct {
 }
 
 type IndexInputDTO struct {
-	ID       string `json:"id" binding:"required"`
-	Analyzer string `json:"analyzer" binding:"required"`
+	ID        string            `json:"id" binding:"required"`
+	Analyzer  string            `json:"analyzer" binding:"required"`
+	Stopwords []string          `json:"stopwords,omitempty"`
+	Synonyms  map[string]string `json:"synonyms,omitempty"`
 }
 
 type IndexOutputDTO struct {
-	ID       string `json:"id"`
-	Analyzer string `json:"analyzer"`
-	Docs     int    `json:"docs"`
+	ID        string            `json:"id"`
+	Analyzer  string            `json:"analyzer"`
+	Docs      int               `json:"docs"`
+	Stopwords []string          `json:"stopwords,omitempty"`
+	Synonyms  map[string]string `json:"synonyms,omitempty"`
 }
 
 type DocumentDTO struct {
@@ -57,9 +61,19 @@ type SearchOutputDTO struct {
 	Size int                `json:"size"`
 }
 
-var analyzers = map[string]analysis.Analyzer{
-	analysis.StandardAnalyzer.String():   analysis.StandardAnalyzer,
-	analysis.WhitespaceAnalyzer.String(): analysis.WhitespaceAnalyzer,
+func newAnalyzer(dto IndexInputDTO) analysis.Analyzer {
+	analyzer := strings.ToLower(dto.Analyzer)
+	stopwords := make(map[string]struct{})
+	for _, stopword := range dto.Stopwords {
+		stopwords[stopword] = struct{}{}
+	}
+	if analyzer == "standardanalyzer" {
+		return analysis.StandardAnalyzer{Settings: analysis.Settings{Stopwords: stopwords, Synonyms: dto.Synonyms}}
+	}
+	if analyzer == "whitespaceanalyzer" {
+		return analysis.WhitespaceAnalyzer{Settings: analysis.Settings{Stopwords: stopwords, Synonyms: dto.Synonyms}}
+	}
+	return nil
 }
 
 var filters = map[string]search.Filter{
@@ -89,8 +103,8 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 		return
 	}
 
-	analyzer, ok := analyzers[json.Analyzer]
-	if !ok {
+	analyzer := newAnalyzer(json)
+	if analyzer == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Analyzer not found"})
 		return
 	}
@@ -110,8 +124,10 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 
 func (ic IndexCtrl) GetIndex(c *gin.Context) {
 	idx := ic.index(c).Index
+	analyzer := idx.GetAnalyzer()
 	c.JSON(http.StatusOK,
-		IndexOutputDTO{ID: c.Param("id"), Analyzer: idx.GetAnalyzer(), Docs: idx.Length()})
+		IndexOutputDTO{ID: c.Param("id"), Analyzer: analyzer.String(),
+			Docs: idx.Length(), Stopwords: analyzer.GetStopwords(), Synonyms: analyzer.GetSynonyms()})
 }
 
 func (ic IndexCtrl) DeleteIndex(c *gin.Context) {
@@ -127,7 +143,7 @@ func (ic IndexCtrl) GetIndexes(c *gin.Context) {
 	list := make([]IndexOutputDTO, 0, len(indexes))
 
 	for _, idx := range indexes {
-		outputDto := IndexOutputDTO{ID: idx.ID, Analyzer: idx.Index.GetAnalyzer(), Docs: idx.Index.Length()}
+		outputDto := IndexOutputDTO{ID: idx.ID, Analyzer: idx.Index.GetAnalyzer().String(), Docs: idx.Index.Length()}
 		list = append(list, outputDto)
 	}
 
@@ -256,4 +272,11 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, SearchOutputDTO{Docs: docsDto, Size: len(docs)})
+}
+
+func (ic IndexCtrl) Analyze(c *gin.Context) {
+	idx := ic.index(c)
+	analyzer := idx.Index.GetAnalyzer()
+	tokens := analyzer.Analyze(c.Query("text"))
+	c.JSON(http.StatusOK, tokens)
 }

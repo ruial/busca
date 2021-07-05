@@ -15,11 +15,11 @@ func TestExportImport(t *testing.T) {
 		t.Skip("Skipping integration test")
 	}
 	out := "../../testdata/index.out"
-	analyzer := analysis.StandardAnalyzer
+	analyzer := analysis.StandardAnalyzer{Settings: analysis.Settings{Stopwords: map[string]struct{}{"the": {}}}}
 	idx, _ := LoadDocuments("../../testdata/books", analyzer)
 	Export(idx, out)
 	idx2, _ := Import(out)
-	if idx2.analyzer != analyzer {
+	if len(idx2.analyzer.(analysis.StandardAnalyzer).Stopwords) != len(analyzer.Stopwords) {
 		t.Error("Imported index should have the same analyzer")
 	}
 	if idx2.Length() != idx.Length() {

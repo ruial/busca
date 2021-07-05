@@ -122,8 +122,8 @@ func (i *Index) hasDocument(id core.DocumentID) bool {
 	return ok
 }
 
-func (i *Index) GetAnalyzer() string {
-	return i.analyzer.String()
+func (i *Index) GetAnalyzer() analysis.Analyzer {
+	return i.analyzer
 }
 
 func (i *Index) filterDocuments(terms []string, filterFn search.Filter) map[core.DocumentID]core.DocumentData {
