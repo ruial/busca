@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// SafeJoin joins two paths and the resulting path always has the base prefix to prevent directory traversal
+// Alternative implementation: https://github.com/opencontainers/runc/blob/master/libcontainer/utils/utils.go
 func SafeJoin(baseDir, file string) (string, error) {
 	out := path.Join(baseDir, file)
 	prefixAbs, err := filepath.Abs(baseDir)
