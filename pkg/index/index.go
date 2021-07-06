@@ -126,6 +126,10 @@ func (i *Index) GetAnalyzer() analysis.Analyzer {
 	return i.analyzer
 }
 
+func (i *Index) GetTermFrequencies(id core.DocumentID) core.TermFrequency {
+	return i.documents[id].Frequencies
+}
+
 func (i *Index) filterDocuments(terms []string, filterFn search.Filter) map[core.DocumentID]core.DocumentData {
 	i.docsMutex.RLock()
 	defer i.docsMutex.RUnlock()

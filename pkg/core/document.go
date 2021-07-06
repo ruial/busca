@@ -41,8 +41,7 @@ func (ds DocumentScore) String() string {
 // TermFrequency stores relative or absolute term frequencies
 type TermFrequency map[string]float64
 
-// Top terms, just a test using the heap data structure
-func (tf TermFrequency) Top(n int) []string {
+func (tf TermFrequency) Top(n int) []FloatHeapItem {
 	if n > len(tf) {
 		n = len(tf)
 	}
@@ -51,9 +50,9 @@ func (tf TermFrequency) Top(n int) []string {
 	for k, v := range tf {
 		heap.Push(tfHeap, FloatHeapItem{Key: k, Value: v})
 	}
-	terms := make([]string, 0, n)
+	terms := make([]FloatHeapItem, 0, n)
 	for i := 0; i < n; i++ {
-		terms = append(terms, heap.Pop(tfHeap).(FloatHeapItem).Key.(string))
+		terms = append(terms, heap.Pop(tfHeap).(FloatHeapItem))
 	}
 	return terms
 }

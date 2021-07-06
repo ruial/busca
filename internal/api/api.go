@@ -36,6 +36,7 @@ func SetupRouter(indexRepository repository.IndexRepo) *gin.Engine {
 
 	router.POST("/indexes/:id/docs", indexExistsMiddleware, indexController.CreateDocument)
 	router.GET("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.GetDocument)
+	router.GET("/indexes/:id/docs/:docId/_terms", indexExistsMiddleware, indexController.TopTerms)
 	router.PUT("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.UpdateDocument)
 	router.DELETE("/indexes/:id/docs/:docId", indexExistsMiddleware, indexController.DeleteDocument)
 

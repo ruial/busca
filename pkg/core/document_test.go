@@ -2,17 +2,17 @@ package core
 
 import (
 	"testing"
-
-	"github.com/ruial/busca/internal/util"
 )
 
 func TestTopTerms(t *testing.T) {
 	query := []string{"some2", "some2", "test3", "test3", "test3", "query1"}
-	expected := []string{"test3", "some2", "query1"}
+	expected := []FloatHeapItem{{"test3", 3}, {"some2", 2}, {"query1", 1}}
 	tf := NewTermFrequency(query)
 	top := tf.Top(20)
-	if !util.StringArrayEquals(top, expected, true) {
-		t.Error("Invalid top terms:", top, expected)
+	for i := range top {
+		if top[i] != expected[i] {
+			t.Error("Invalid top terms:", top[i], expected[i])
+		}
 	}
 	top = tf.Top(2)
 	if len(top) != 2 {

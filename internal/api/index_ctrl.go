@@ -311,3 +311,14 @@ func (ic IndexCtrl) Analyze(c *gin.Context) {
 	tokens := analyzer.Analyze(c.Query("text"))
 	c.JSON(http.StatusOK, tokens)
 }
+
+func (ic IndexCtrl) TopTerms(c *gin.Context) {
+	idx := ic.index(c)
+	n, err := strconv.Atoi(c.DefaultQuery("top", "5"))
+	if err != nil || n < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid top parameter"})
+		return
+	}
+	termFrequencies := idx.Index.GetTermFrequencies(c.Param("docId")).Top(n)
+	c.JSON(http.StatusOK, termFrequencies)
+}
