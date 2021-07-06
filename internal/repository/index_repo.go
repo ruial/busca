@@ -3,11 +3,11 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ruial/busca/internal/util"
 	"github.com/ruial/busca/pkg/index"
@@ -44,15 +44,21 @@ type IndexRepo interface {
 	GetIndex(id string) (IdentifiableIndex, bool)
 	CreateIndex(idx IdentifiableIndex) error
 	DeleteIndex(id string) error
+	UpdateIndex(idx IdentifiableIndex) error
+}
+
+type Snapshotter interface {
 	SnapshotExport() error
 	SnapshotImport() error
 	IsSnapshotEnabled() bool
+	ToggleSnapshots()
 }
 
 type LocalIndexRepo struct {
-	SnapshotDir      string
-	SnapshotInterval time.Duration
-	indexes          sync.Map
+	SnapshotDir     string
+	SnapshotEnabled bool
+	indexes         sync.Map
+	toSnapshot      sync.Map
 }
 
 func (r *LocalIndexRepo) GetIndexes() (list []IdentifiableIndex) {
@@ -75,16 +81,19 @@ func (r *LocalIndexRepo) CreateIndex(idx IdentifiableIndex) error {
 	if _, ok := r.indexes.Load(idx.ID); ok {
 		return ErrIndexAlreadyExists
 	}
-	r.indexes.Store(string(idx.ID), idx)
+	r.indexes.Store(idx.ID, idx)
+	r.markIndexForSnapshot(idx.ID)
 	return nil
 }
 
 func (r *LocalIndexRepo) DeleteIndex(id string) error {
+	r.toSnapshot.Delete(id)
 	_, ok := r.indexes.LoadAndDelete(id)
 	if !ok {
 		return ErrIndexDoesNotExist
 	}
 	if r.IsSnapshotEnabled() {
+		// because of route handler and validations, should never reach path traversal error
 		out, err := util.SafeJoin(r.SnapshotDir, id+indexExtension)
 		if err != nil {
 			return err
@@ -92,6 +101,18 @@ func (r *LocalIndexRepo) DeleteIndex(id string) error {
 		return os.Remove(out)
 	}
 	return nil
+}
+
+func (r *LocalIndexRepo) markIndexForSnapshot(id string) error {
+	if r.IsSnapshotEnabled() {
+		log.Println("Marked index for snapshot:", id)
+		r.toSnapshot.Store(id, struct{}{})
+	}
+	return nil
+}
+
+func (r *LocalIndexRepo) UpdateIndex(idx IdentifiableIndex) error {
+	return r.markIndexForSnapshot(idx.ID)
 }
 
 func (r *LocalIndexRepo) SnapshotExport() error {
@@ -104,6 +125,11 @@ func (r *LocalIndexRepo) SnapshotExport() error {
 		}
 	}
 	for _, idx := range r.GetIndexes() {
+		// check if index is marked for snapshot and unmark it
+		if _, ok := r.toSnapshot.LoadAndDelete(idx.ID); !ok {
+			continue
+		}
+		log.Println("Snapshotting index:", idx.ID)
 		out, err := util.SafeJoin(r.SnapshotDir, idx.ID+indexExtension)
 		if err != nil {
 			return err
@@ -131,12 +157,16 @@ func (r *LocalIndexRepo) SnapshotImport() error {
 			if err != nil {
 				return fmt.Errorf("Error importing index %s: %s", id, err.Error())
 			}
-			r.CreateIndex(IdentifiableIndex{ID: id, Index: idx})
+			r.indexes.Store(id, IdentifiableIndex{ID: id, Index: idx})
 		}
 	}
 	return nil
 }
 
 func (r *LocalIndexRepo) IsSnapshotEnabled() bool {
-	return r.SnapshotInterval > 0
+	return r.SnapshotEnabled
+}
+
+func (r *LocalIndexRepo) ToggleSnapshots() {
+	r.SnapshotEnabled = !r.SnapshotEnabled
 }

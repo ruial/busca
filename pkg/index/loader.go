@@ -111,5 +111,6 @@ func init() {
 	// must register every type of interface implementations to export/import
 	gob.Register(core.BaseDocument{})
 	gob.Register(analysis.StandardAnalyzer{})
+	gob.Register(analysis.SimpleAnalyzer{})
 	gob.Register(analysis.WhitespaceAnalyzer{})
 }

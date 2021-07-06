@@ -15,19 +15,19 @@ import (
 	"github.com/ruial/busca/internal/repository"
 )
 
-func exportIndexRepo(indexRepo repository.IndexRepo) {
-	log.Println("Exporting index")
+func exportIndexRepo(snapshotter repository.Snapshotter) {
+	log.Println("Exporting indexes")
 	start := time.Now()
-	if err := indexRepo.SnapshotExport(); err != nil {
+	if err := snapshotter.SnapshotExport(); err != nil {
 		log.Println(err)
 	}
 	log.Println("Elapsed exporting:", time.Now().Sub(start))
 }
 
-func importIndexRepo(indexRepo repository.IndexRepo) {
-	log.Println("Importing index")
+func importIndexRepo(snapshotter repository.Snapshotter) {
+	log.Println("Importing indexes")
 	start := time.Now()
-	if err := indexRepo.SnapshotImport(); err != nil {
+	if err := snapshotter.SnapshotImport(); err != nil {
 		log.Println(err)
 	}
 	log.Println("Elapsed importing:", time.Now().Sub(start))
@@ -55,15 +55,14 @@ func main() {
 		snapshotIntervalDuration = duration
 	}
 
-	var indexRepo repository.IndexRepo
-	indexRepo = &repository.LocalIndexRepo{
-		SnapshotDir:      *dataDir,
-		SnapshotInterval: snapshotIntervalDuration,
+	localRepo := &repository.LocalIndexRepo{
+		SnapshotDir:     *dataDir,
+		SnapshotEnabled: snapshotIntervalDuration > 0,
 	}
-	importIndexRepo(indexRepo)
+	importIndexRepo(localRepo)
 
 	addr := *address + ":" + *port
-	router := api.SetupRouter(indexRepo)
+	router := api.SetupRouter(localRepo)
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: router,
@@ -80,7 +79,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	done := make(chan struct{})
-	if indexRepo.IsSnapshotEnabled() {
+	if localRepo.IsSnapshotEnabled() {
 		wg.Add(1)
 		ticker := time.NewTicker(snapshotIntervalDuration)
 		defer ticker.Stop()
@@ -88,10 +87,10 @@ func main() {
 			for {
 				select {
 				case <-ticker.C:
-					exportIndexRepo(indexRepo)
+					exportIndexRepo(localRepo)
 				case <-done:
 					log.Println("Stopping snapshots")
-					exportIndexRepo(indexRepo)
+					exportIndexRepo(localRepo)
 					wg.Done()
 					return
 				}

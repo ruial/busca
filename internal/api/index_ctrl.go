@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ type IndexInputDTO struct {
 	Analyzer  string            `json:"analyzer" binding:"required"`
 	Stopwords []string          `json:"stopwords,omitempty"`
 	Synonyms  map[string]string `json:"synonyms,omitempty"`
+	Stemmer   string            `json:"stemmer,omitempty"`
 }
 
 type IndexOutputDTO struct {
@@ -30,6 +32,7 @@ type IndexOutputDTO struct {
 	Docs      int               `json:"docs"`
 	Stopwords []string          `json:"stopwords,omitempty"`
 	Synonyms  map[string]string `json:"synonyms,omitempty"`
+	Stemmer   string            `json:"stemmer,omitempty"`
 }
 
 type DocumentDTO struct {
@@ -61,19 +64,27 @@ type SearchOutputDTO struct {
 	Size int                `json:"size"`
 }
 
-func newAnalyzer(dto IndexInputDTO) analysis.Analyzer {
-	analyzer := strings.ToLower(dto.Analyzer)
+func newAnalyzer(dto IndexInputDTO) (analyzer analysis.Analyzer, err error) {
+	analyzerName := strings.ToLower(dto.Analyzer)
 	stopwords := make(map[string]struct{})
 	for _, stopword := range dto.Stopwords {
 		stopwords[stopword] = struct{}{}
 	}
-	if analyzer == "standardanalyzer" {
-		return analysis.StandardAnalyzer{Settings: analysis.Settings{Stopwords: stopwords, Synonyms: dto.Synonyms}}
+	settings, err := analysis.NewSettings(stopwords, dto.Synonyms, dto.Stemmer)
+	if err != nil {
+		return
 	}
-	if analyzer == "whitespaceanalyzer" {
-		return analysis.WhitespaceAnalyzer{Settings: analysis.Settings{Stopwords: stopwords, Synonyms: dto.Synonyms}}
+	switch analyzerName {
+	case "standardanalyzer":
+		analyzer = analysis.StandardAnalyzer{Settings: settings}
+	case "simpleanalyzer":
+		analyzer = analysis.SimpleAnalyzer{Settings: settings}
+	case "whitespaceanalyzer":
+		analyzer = analysis.WhitespaceAnalyzer{Settings: settings}
+	default:
+		err = errors.New("Invalid analyzer")
 	}
-	return nil
+	return
 }
 
 var filters = map[string]search.Filter{
@@ -103,9 +114,9 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 		return
 	}
 
-	analyzer := newAnalyzer(json)
-	if analyzer == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Analyzer not found"})
+	analyzer, err := newAnalyzer(json)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -116,7 +127,11 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 	}
 
 	if err := ic.IndexRepository.CreateIndex(idx); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		code := http.StatusInternalServerError
+		if errors.Is(err, repository.ErrIndexAlreadyExists) {
+			code = http.StatusConflict
+		}
+		c.JSON(code, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, json)
@@ -126,13 +141,17 @@ func (ic IndexCtrl) GetIndex(c *gin.Context) {
 	idx := ic.index(c).Index
 	analyzer := idx.GetAnalyzer()
 	c.JSON(http.StatusOK,
-		IndexOutputDTO{ID: c.Param("id"), Analyzer: analyzer.String(),
-			Docs: idx.Length(), Stopwords: analyzer.GetStopwords(), Synonyms: analyzer.GetSynonyms()})
+		IndexOutputDTO{ID: c.Param("id"), Analyzer: analyzer.String(), Docs: idx.Length(),
+			Stopwords: analyzer.GetStopwords(), Synonyms: analyzer.GetSynonyms(), Stemmer: analyzer.GetStemmer()})
 }
 
 func (ic IndexCtrl) DeleteIndex(c *gin.Context) {
 	if err := ic.IndexRepository.DeleteIndex(c.Param("id")); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		code := http.StatusInternalServerError
+		if errors.Is(err, repository.ErrIndexDoesNotExist) {
+			code = http.StatusNotFound
+		}
+		c.JSON(code, gin.H{"error": err.Error()})
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -160,6 +179,10 @@ func (ic IndexCtrl) CreateDocument(c *gin.Context) {
 	idx := ic.index(c)
 	if err := idx.Index.AddDocument(core.NewBaseDocument(json.ID, json.Text)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, json)
@@ -194,6 +217,10 @@ func (ic IndexCtrl) UpdateDocument(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
+	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, DocumentDTO{ID: doc.ID(), Text: doc.Text()})
 }
 
@@ -201,6 +228,10 @@ func (ic IndexCtrl) DeleteDocument(c *gin.Context) {
 	idx := ic.index(c)
 	if err := idx.Index.DeleteDocument(c.Param("docId")); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if err := ic.IndexRepository.UpdateIndex(idx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.Status(http.StatusNoContent)
