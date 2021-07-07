@@ -24,6 +24,10 @@ type IndexInputDTO struct {
 	Stopwords []string          `json:"stopwords,omitempty"`
 	Synonyms  map[string]string `json:"synonyms,omitempty"`
 	Stemmer   string            `json:"stemmer,omitempty"`
+	Fuzziness struct {
+		MinTermCount    int `json:"min_term_count,omitempty"`
+		MaxEditDistance int `json:"max_edit_distance,omitempty"`
+	} `json:"fuzziness,omitempty"`
 }
 
 type IndexOutputDTO struct {
@@ -51,6 +55,7 @@ type SearchInputDTO struct {
 	TfWeight    string `json:"tf_weight"`
 	IdfWeight   string `json:"idf_weight"`
 	IncludeText bool   `json:"include_text"`
+	Top         int
 }
 
 type DocumentScoreDTO struct {
@@ -120,7 +125,9 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 		return
 	}
 
-	idx, err := repository.NewIdentifiableIndex(json.ID, index.New(analyzer))
+	indexOpts := index.Opts{Analyzer: analyzer,
+		FuzzyMinOccurrences: json.Fuzziness.MinTermCount, FuzzyDepth: json.Fuzziness.MaxEditDistance}
+	idx, err := repository.NewIdentifiableIndex(json.ID, index.New(indexOpts))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -243,6 +250,7 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 		TfWeight:    "default",
 		IdfWeight:   "default",
 		IncludeText: true,
+		Top:         20,
 	}
 	if c.Request.Method == http.MethodGet {
 		inputDto.Query = c.Query("query")
@@ -261,6 +269,12 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 		if strings.ToLower(c.Query("include_text")) == "false" {
 			inputDto.IncludeText = false
 		}
+		top, err := strconv.Atoi(c.DefaultQuery("top", "20"))
+		if err != nil || top < 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid top parameter"})
+			return
+		}
+		inputDto.Top = top
 	} else {
 		if err := c.ShouldBindJSON(&inputDto); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -293,8 +307,13 @@ func (ic IndexCtrl) SearchDocuments(c *gin.Context) {
 	idx := ic.index(c).Index
 	docs := idx.SearchDocuments(inputDto.Query, filter, ranker)
 
-	docsDto := make([]DocumentScoreDTO, 0, len(docs))
-	for _, res := range docs {
+	max := inputDto.Top
+	if max > len(docs) {
+		max = len(docs)
+	}
+	docsDto := make([]DocumentScoreDTO, 0, max)
+	for i := 0; i < max; i++ {
+		res := docs[i]
 		docDto := DocumentScoreDTO{ID: res.Doc.ID(), Score: res.Score}
 		if inputDto.IncludeText {
 			docDto.Text = res.Doc.Text()
@@ -321,4 +340,20 @@ func (ic IndexCtrl) TopTerms(c *gin.Context) {
 	}
 	termFrequencies := idx.Index.GetTermFrequencies(c.Param("docId")).Top(n)
 	c.JSON(http.StatusOK, termFrequencies)
+}
+
+func (ic IndexCtrl) Suggestions(c *gin.Context) {
+	idx := ic.index(c)
+	n, err := strconv.Atoi(c.DefaultQuery("top", "5"))
+	if err != nil || n < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid top parameter"})
+		return
+	}
+	terms := idx.Index.GetAnalyzer().Analyze(c.Query("query"))
+	suggestions := idx.Index.GetSpellSuggestions(terms, n)
+	if suggestions == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Suggester not enabled"})
+		return
+	}
+	c.JSON(http.StatusOK, suggestions)
 }

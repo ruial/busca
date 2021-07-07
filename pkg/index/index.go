@@ -7,6 +7,7 @@ import (
 	"github.com/ruial/busca/pkg/analysis"
 	"github.com/ruial/busca/pkg/core"
 	"github.com/ruial/busca/pkg/search"
+	"github.com/sajari/fuzzy"
 )
 
 var (
@@ -22,18 +23,35 @@ const (
 	upsertMode
 )
 
-type Index struct {
-	terms     map[string][]core.DocumentID
-	documents map[core.DocumentID]core.DocumentData
-	analyzer  analysis.Analyzer
-	docsMutex sync.RWMutex
+type Opts struct {
+	Analyzer            analysis.Analyzer
+	FuzzyMinOccurrences int
+	FuzzyDepth          int
 }
 
-func New(analyzer analysis.Analyzer) *Index {
+type Index struct {
+	terms      map[string][]core.DocumentID
+	documents  map[core.DocumentID]core.DocumentData
+	analyzer   analysis.Analyzer
+	fuzzyModel *fuzzy.Model
+	docsMutex  sync.RWMutex
+}
+
+func New(opts Opts) *Index {
+	if opts.FuzzyMinOccurrences < 1 {
+		opts.FuzzyMinOccurrences = fuzzy.SpellThresholdDefault
+	}
+	if opts.FuzzyDepth < 0 {
+		opts.FuzzyDepth = fuzzy.SpellDepthDefault
+	}
 	index := new(Index)
 	index.terms = make(map[string][]core.DocumentID)
 	index.documents = make(map[core.DocumentID]core.DocumentData)
-	index.analyzer = analyzer
+	index.analyzer = opts.Analyzer
+	index.fuzzyModel = fuzzy.NewModel()
+	index.fuzzyModel.SetThreshold(opts.FuzzyMinOccurrences)
+	index.fuzzyModel.SetDepth(opts.FuzzyDepth)
+	index.fuzzyModel.SetUseAutocomplete(false)
 	return index
 }
 
@@ -62,6 +80,9 @@ func (i *Index) addDocument(document core.Document, idxMode indexMode) error {
 		termsCount += f
 	}
 	i.documents[id] = core.DocumentData{Doc: document, Frequencies: frequencies, TermsCount: termsCount}
+	if i.fuzzyModel.Depth > 0 {
+		i.fuzzyModel.Train(terms)
+	}
 	return nil
 }
 
@@ -130,6 +151,22 @@ func (i *Index) GetTermFrequencies(id core.DocumentID) core.TermFrequency {
 	return i.documents[id].Frequencies
 }
 
+func (i *Index) GetSpellSuggestions(terms []string, top int) (suggestions map[string][]string) {
+	if i.fuzzyModel.Depth < 1 {
+		return
+	}
+	suggestions = make(map[string][]string)
+	for _, term := range terms {
+		results := i.fuzzyModel.SpellCheckSuggestions(term, top)
+		if results == nil {
+			suggestions[term] = []string{}
+		} else {
+			suggestions[term] = results
+		}
+	}
+	return
+}
+
 func (i *Index) filterDocuments(terms []string, filterFn search.Filter) map[core.DocumentID]core.DocumentData {
 	i.docsMutex.RLock()
 	defer i.docsMutex.RUnlock()
@@ -158,19 +195,4 @@ func (i *Index) SearchDocuments(query string, filterFn search.Filter, rankFn sea
 		documentScores = rankFn(terms, docsData)
 	}
 	return
-}
-
-func (i *Index) Clone() *Index {
-	i.docsMutex.Lock()
-	defer i.docsMutex.Unlock()
-	clone := New(i.analyzer)
-	for k, v := range i.terms {
-		clone.terms[k] = make([]core.DocumentID, len(v))
-		copy(clone.terms[k], v)
-	}
-	for k, v := range i.documents {
-		// no need to copy as the value is not a pointer
-		clone.documents[k] = v
-	}
-	return clone
 }

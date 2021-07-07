@@ -71,7 +71,7 @@ func addDocuments(engine string, idxId string, docs []core.DocumentScore) {
 func main() {
 	// Measure index speed on busca and elasticsearch on a sample dataset
 	fmt.Println("loading documents to in memory index")
-	idx, err := index.LoadDocuments("testdata/books", analysis.WhitespaceAnalyzer{})
+	idx, err := index.LoadDocuments("testdata/books", index.Opts{Analyzer: analysis.WhitespaceAnalyzer{}})
 	if err != nil {
 		panic(err)
 	}

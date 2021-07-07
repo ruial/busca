@@ -10,15 +10,25 @@ import (
 
 	"github.com/ruial/busca/pkg/analysis"
 	"github.com/ruial/busca/pkg/core"
+	"github.com/sajari/fuzzy"
 )
 
 type Gobber struct {
 	index *Index
 }
 
+// fuzzy.Model has an embedded mutex, which causes issues with GobEncoder
+type fuzzyEncodable struct {
+	Data      map[string]*fuzzy.Counts
+	Maxcount  int
+	Suggest   map[string][]string
+	Depth     int
+	Threshold int
+}
+
 func (g *Gobber) GobEncode() ([]byte, error) {
-	g.index.docsMutex.Lock()
-	defer g.index.docsMutex.Unlock()
+	g.index.docsMutex.RLock()
+	defer g.index.docsMutex.RUnlock()
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
 	if err := encoder.Encode(g.index.terms); err != nil {
@@ -28,6 +38,17 @@ func (g *Gobber) GobEncode() ([]byte, error) {
 		return nil, err
 	}
 	if err := encoder.Encode(&g.index.analyzer); err != nil {
+		return nil, err
+	}
+	// assume that Index was initialized with New, so fuzzyModel is never nil
+	fuzzyModel := fuzzyEncodable{
+		Data:      g.index.fuzzyModel.Data,
+		Maxcount:  g.index.fuzzyModel.Maxcount,
+		Suggest:   g.index.fuzzyModel.Suggest,
+		Depth:     g.index.fuzzyModel.Depth,
+		Threshold: g.index.fuzzyModel.Threshold,
+	}
+	if err := encoder.Encode(&fuzzyModel); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil
@@ -44,7 +65,21 @@ func (g *Gobber) GobDecode(buf []byte) error {
 	if err := decoder.Decode(&g.index.documents); err != nil {
 		return err
 	}
-	return decoder.Decode(&g.index.analyzer)
+	if err := decoder.Decode(&g.index.analyzer); err != nil {
+		return err
+	}
+	fuzzyModel := &fuzzyEncodable{}
+	if err := decoder.Decode(fuzzyModel); err != nil {
+		return err
+	}
+	g.index.fuzzyModel = &fuzzy.Model{
+		Data:      fuzzyModel.Data,
+		Maxcount:  fuzzyModel.Maxcount,
+		Suggest:   fuzzyModel.Suggest,
+		Depth:     fuzzyModel.Depth,
+		Threshold: fuzzyModel.Threshold,
+	}
+	return nil
 }
 
 func loadFile(idx *Index, filePath string) error {
@@ -57,12 +92,12 @@ func loadFile(idx *Index, filePath string) error {
 	return nil
 }
 
-func LoadDocuments(dir string, analyzer analysis.Analyzer) (*Index, error) {
+func LoadDocuments(dir string, indexOpts Opts) (*Index, error) {
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
-	idx := New(analyzer)
+	idx := New(indexOpts)
 	var wg sync.WaitGroup
 	for _, file := range files {
 		wg.Add(1)

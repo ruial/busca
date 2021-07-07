@@ -4,8 +4,12 @@
 # As busca is much simpler and has less features, it is faster on a single node
 
 curl -X POST http://localhost:8080/indexes \
-  -H 'Content-Type: application/json; charset=utf-8' \
-  -d'{"id": "test-index","analyzer": "WhitespaceAnalyzer"}'
+  -H 'content-type: application/json; charset=utf-8' \
+  -d '{"id": "test-index","analyzer": "StandardAnalyzer","fuzziness": {"min_term_count": 50, "max_edit_distance": 2}}'
+
+# curl -X POST http://localhost:8080/indexes \
+#   -H 'Content-Type: application/json; charset=utf-8' \
+#   -d'{"id": "test-index","analyzer": "WhitespaceAnalyzer"}'
 
 # curl -X PUT http://localhost:9200/test-index \
 #   -H 'Content-Type: application/json; charset=utf-8' \

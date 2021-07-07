@@ -134,8 +134,7 @@ func (r *LocalIndexRepo) SnapshotExport() error {
 		if err != nil {
 			return err
 		}
-		// cloning is faster than serializing, so lock time is reduced for readers
-		if err := index.Export(idx.Index.Clone(), out); err != nil {
+		if err := index.Export(idx.Index, out); err != nil {
 			return fmt.Errorf("Error exporting index %s: %s", idx.ID, err.Error())
 		}
 	}

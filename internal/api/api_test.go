@@ -19,7 +19,7 @@ var router *gin.Engine
 
 func init() {
 	indexRepo := &repository.LocalIndexRepo{}
-	index := index.New(analysis.SimpleAnalyzer{})
+	index := index.New(index.Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	index.AddDocument(core.NewBaseDocument("doc1", "sample document"))
 	indexRepo.CreateIndex(repository.IdentifiableIndex{ID: "test", Index: index})
 	router = SetupRouter(indexRepo)

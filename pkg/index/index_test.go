@@ -13,7 +13,7 @@ import (
 )
 
 func TestAdd(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	doc := core.NewBaseDocument("id", "text")
 	if err := idx.AddDocument(doc); err != nil {
 		t.Error("First document should not throw error")
@@ -30,7 +30,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	doc := core.NewBaseDocument("id", "text")
 	if err := idx.UpdateDocument(doc); !errors.Is(err, ErrNonExistentDocument) {
 		t.Error("Update non existing throw error")
@@ -49,7 +49,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestUpsert(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	doc := core.NewBaseDocument("id", "text")
 	if err := idx.UpsertDocument(doc); err != nil {
 		t.Error("Upsert should not throw error on create")
@@ -67,7 +67,7 @@ func TestUpsert(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	doc := core.NewBaseDocument("id", "text")
 	idx.AddDocument(doc)
 	err := idx.DeleteDocument(doc.ID())
@@ -86,26 +86,8 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-func TestClone(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
-	idx.AddDocument(core.NewBaseDocument("id", "my text"))
-	clone := idx.Clone()
-	idx.AddDocument(core.NewBaseDocument("id2", "another text"))
-	if clone.Length() == idx.Length() {
-		t.Error("Documents should be a copy")
-	}
-	idx.terms["my"][0] = "edit"
-	if clone.terms["my"][0] == "edit" {
-		t.Error("Terms array should be a copy")
-	}
-	idx.analyzer = analysis.WhitespaceAnalyzer{}
-	if clone.GetAnalyzer().String() == idx.GetAnalyzer().String() {
-		t.Error("Analyzer should be a copy")
-	}
-}
-
 func TestAddDeleteConcurrent(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	// repeat some document ids to simulate collisions
 	length := 100
 	threads := 1000
@@ -139,7 +121,7 @@ func TestAddDeleteConcurrent(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	for _, doc := range []core.BaseDocument{
 		core.NewBaseDocument("1", "the first example example"),
 		core.NewBaseDocument("2", "another cool example"),
@@ -176,7 +158,7 @@ func TestSearch(t *testing.T) {
 }
 
 func BenchmarkAdd(b *testing.B) {
-	idx := New(analysis.SimpleAnalyzer{})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
 	bytes, err := os.ReadFile("../../testdata/books/Dracula.txt")
 	if err != nil {
 		b.Error("File not found")

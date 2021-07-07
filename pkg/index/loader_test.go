@@ -16,15 +16,19 @@ func TestExportImport(t *testing.T) {
 	}
 	out := "../../testdata/index.out"
 	analyzer := analysis.SimpleAnalyzer{Settings: analysis.Settings{Stopwords: map[string]struct{}{"the": {}}}}
-	idx, _ := LoadDocuments("../../testdata/books", analyzer)
+	opts := Opts{Analyzer: analyzer, FuzzyDepth: 1, FuzzyMinOccurrences: 50}
+	idx, _ := LoadDocuments("../../testdata/books", opts)
 	Export(idx, out)
 	idx2, _ := Import(out)
-	// could do full equality check (== not enough as struct has map/slice, would have to add an Equal method)
+	// could do full equality check, == not enough as struct has map/slice, would have to add an Equal method
 	if len(idx2.analyzer.(analysis.SimpleAnalyzer).Stopwords) != len(analyzer.Stopwords) {
 		t.Error("Imported index should have the same analyzer")
 	}
 	if idx2.Length() != idx.Length() {
 		t.Error("Imported index should have the same length")
+	}
+	if len(idx.GetSpellSuggestions([]string{"mor"}, 3)) != len(idx2.GetSpellSuggestions([]string{"mor"}, 3)) {
+		t.Error("Expected fuzzy suggestions to be the same")
 	}
 	tfidfRanker := search.TfIdfRanker(search.TfWeightDefault, search.IdfWeightDefault)
 	expected := idx.SearchDocuments("crime detective", nil, tfidfRanker)
