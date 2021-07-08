@@ -158,7 +158,7 @@ func TestSearch(t *testing.T) {
 }
 
 func BenchmarkAdd(b *testing.B) {
-	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}})
+	idx := New(Opts{Analyzer: analysis.SimpleAnalyzer{}, FuzzyDepth: 2, FuzzyMinOccurrences: 50})
 	bytes, err := os.ReadFile("../../testdata/books/Dracula.txt")
 	if err != nil {
 		b.Error("File not found")
@@ -184,4 +184,20 @@ func BenchmarkAdd(b *testing.B) {
 	if idxLength != length {
 		b.Errorf("Expected length was %d, received %d", length, b.N)
 	}
+}
+
+func BenchmarkSearch(b *testing.B) {
+	analyzer := analysis.SimpleAnalyzer{Settings: analysis.Settings{Stemmer: "english"}}
+	opts := Opts{Analyzer: analyzer, FuzzyDepth: 2, FuzzyMinOccurrences: 50}
+	idx, _ := LoadDocuments("../../testdata/books", opts)
+	query := idx.GetDocument("../../testdata/books/Dracula.txt").Text()[800:1000]
+	var wg sync.WaitGroup
+	for i := 0; i < b.N; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			idx.SearchDocuments(query, search.OrFilter, search.TfIdfRanker(search.TfWeightLog, search.IdfWeightSmooth))
+		}(i)
+	}
+	wg.Wait()
 }

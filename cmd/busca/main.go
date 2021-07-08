@@ -21,7 +21,7 @@ func exportIndexRepo(snapshotter repository.Snapshotter) {
 	if err := snapshotter.SnapshotExport(); err != nil {
 		log.Println(err)
 	}
-	log.Println("Elapsed exporting:", time.Now().Sub(start))
+	log.Println("Elapsed exporting:", time.Since(start))
 }
 
 func importIndexRepo(snapshotter repository.Snapshotter) {
@@ -30,7 +30,7 @@ func importIndexRepo(snapshotter repository.Snapshotter) {
 	if err := snapshotter.SnapshotImport(); err != nil {
 		log.Println(err)
 	}
-	log.Println("Elapsed importing:", time.Now().Sub(start))
+	log.Println("Elapsed importing:", time.Since(start))
 }
 
 func main() {

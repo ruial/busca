@@ -2,9 +2,11 @@ package api
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ruial/busca/internal/repository"
+	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
 func indexExists(ic IndexCtrl) gin.HandlerFunc {
@@ -21,6 +23,16 @@ func indexExists(ic IndexCtrl) gin.HandlerFunc {
 
 func SetupRouter(indexRepository repository.IndexRepo) *gin.Engine {
 	router := gin.Default()
+
+	p := ginprometheus.NewPrometheus("http")
+	p.ReqCntURLLabelMappingFn = func(c *gin.Context) string {
+		url := c.Request.URL.Path
+		for _, p := range c.Params {
+			url = strings.Replace(url, p.Value, ":"+p.Key, 1)
+		}
+		return url
+	}
+	p.Use(router)
 
 	indexController := IndexCtrl{IndexRepository: indexRepository}
 	indexExistsMiddleware := indexExists(indexController)

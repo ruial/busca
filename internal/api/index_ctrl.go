@@ -24,7 +24,7 @@ type IndexInputDTO struct {
 	Stopwords []string          `json:"stopwords,omitempty"`
 	Synonyms  map[string]string `json:"synonyms,omitempty"`
 	Stemmer   string            `json:"stemmer,omitempty"`
-	Fuzziness struct {
+	Fuzziness *struct {
 		MinTermCount    int `json:"min_term_count,omitempty"`
 		MaxEditDistance int `json:"max_edit_distance,omitempty"`
 	} `json:"fuzziness,omitempty"`
@@ -125,8 +125,11 @@ func (ic IndexCtrl) CreateIndex(c *gin.Context) {
 		return
 	}
 
-	indexOpts := index.Opts{Analyzer: analyzer,
-		FuzzyMinOccurrences: json.Fuzziness.MinTermCount, FuzzyDepth: json.Fuzziness.MaxEditDistance}
+	indexOpts := index.Opts{Analyzer: analyzer}
+	if json.Fuzziness != nil {
+		indexOpts.FuzzyMinOccurrences = json.Fuzziness.MinTermCount
+		indexOpts.FuzzyDepth = json.Fuzziness.MaxEditDistance
+	}
 	idx, err := repository.NewIdentifiableIndex(json.ID, index.New(indexOpts))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

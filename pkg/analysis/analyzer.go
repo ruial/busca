@@ -1,12 +1,15 @@
 package analysis
 
 import (
+	"errors"
 	"strings"
 	"unicode"
 
+	porter "github.com/blevesearch/go-porterstemmer"
 	"github.com/blevesearch/segment"
-	"github.com/kljensen/snowball"
 )
+
+var ErrUnavailableStemmer = errors.New("Unavailable stemmer")
 
 type Analyzer interface {
 	Analyze(text string) (terms []string)
@@ -25,7 +28,8 @@ type Settings struct {
 func NewSettings(stopWords map[string]struct{}, synonyms map[string]string, stemmer string) (s Settings, err error) {
 	if stemmer != "" {
 		stemmer = strings.ToLower(stemmer)
-		if _, err = snowball.Stem("", stemmer, false); err != nil {
+		if stemmer != "english" {
+			err = ErrUnavailableStemmer
 			return
 		}
 	}
@@ -45,8 +49,8 @@ func (b Settings) stem(word string) string {
 	if b.Stemmer == "" {
 		return word
 	}
-	stemmed, _ := snowball.Stem(word, b.Stemmer, false)
-	return stemmed
+	// another very fast stemmer is https://github.com/shabbyrobe/go-porter2
+	return string(porter.StemWithoutLowerCasing([]rune(word)))
 }
 
 func (b Settings) GetStopwords() []string {
@@ -65,7 +69,8 @@ func (b Settings) GetStemmer() string {
 	return b.Stemmer
 }
 
-func (b Settings) filterTokens(tokens []string) (result []string) {
+func (b Settings) filterTokens(tokens []string) []string {
+	result := make([]string, 0, len(tokens))
 	for _, token := range tokens {
 		token := b.stem(token)
 		if synonym, ok := b.Synonyms[token]; ok {
@@ -76,7 +81,7 @@ func (b Settings) filterTokens(tokens []string) (result []string) {
 		}
 		result = append(result, token)
 	}
-	return
+	return result
 }
 
 type StandardAnalyzer struct {
