@@ -27,6 +27,7 @@ curl -X POST http://localhost:8080/indexes/test-index/_search \
   -d '{"query": "Alice dream adventures crime detective","filter": "or","tf_weight": "log","idf_weight": "smooth","include_text": false,"top": 3}'
 
 # Library
+# go get github.com/ruial/busca
 idx := index.New(index.Opts{Analyzer: analysis.WhitespaceAnalyzer{}})
 idx.AddDocument(core.NewBaseDocument("doc1", "some text"))
 idx.AddDocument(core.NewBaseDocument("doc2", "even more text"))
