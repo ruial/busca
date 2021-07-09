@@ -10,9 +10,12 @@ on:
     paths:
       - '**.go'
 jobs:
-  steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2
-      with:
-        go-version: '^1.16.5'
-    - run: make test-all
+  run:
+    name: Run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.16.5'
+      - run: make test-all
