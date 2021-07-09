@@ -1,0 +1,83 @@
+### Some examples, should create OpenAPI spec
+
+### get indexes
+GET http://localhost:8080/indexes
+
+### get additional index info
+GET http://localhost:8080/indexes/test-index2
+
+### create index
+POST http://localhost:8080/indexes
+Content-Type: application/json
+
+{
+  "id": "test-index2",
+  "analyzer": "StandardAnalyzer",
+  // other analyzers: SimpleAnalyzer, WhitespaceAnalyzer
+  "stopwords": ["a"],
+  "synonyms": {
+    "quick": "fast",
+    "rapid": "fast"
+  },
+  // "stemmer": "english"
+  // snowball stemmer not recommended with fuzziness as suggested words will be stemmed
+  "fuzziness": {
+    "min_term_count": 1,
+    "max_edit_distance": 2
+  }
+}
+
+### delete index
+DELETE http://localhost:8080/indexes/test-index2
+
+### test analyzer
+GET http://localhost:8080/indexes/test-index2/_analyze?text=quickly worked to say hello 'world' in a rapid way...
+
+### add document
+POST http://localhost:8080/indexes/test-index2/docs
+Content-Type: application/json
+
+{
+  "id": "doc1",
+  "text": "quickly worked to say hello 'world' in a rapid way..."
+}
+
+### get document
+GET http://localhost:8080/indexes/test-index2/docs/doc1
+
+### update document
+PUT http://localhost:8080/indexes/test-index2/docs/doc1?upsert=true
+Content-Type: application/json
+
+{
+  "text": "hello, updated quickly say hello 'world' in a rapid way..."
+}
+
+### delete document
+DELETE http://localhost:8080/indexes/test-index2/docs/doc1
+
+### top terms
+GET http://localhost:8080/indexes/test-index2/docs/doc1/_terms?top=50
+
+### suggestions
+GET http://localhost:8080/indexes/test-index2/_suggest?query=hel
+
+### search with (get)
+GET http://localhost:8080/indexes/test-index2/_search?query=quick
+
+### search documents (post)
+POST http://localhost:8080/indexes/test-index/_search
+Content-Type: application/json
+
+{
+  "query": "Alice dream adventures detective crime",
+  //"filter": "and",
+  "min_match": 3,
+  "tf_weight": "log",
+  "idf_weight": "smooth",
+  "include_text": false,
+  "top": 8
+}
+
+### prometheus metrics
+GET http://localhost:8080/metrics
