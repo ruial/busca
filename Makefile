@@ -20,6 +20,8 @@ test-bench:
 
 test-all: test-race test-bench
 
+# https://golang.org/pkg/net/http/pprof/
+# https://blog.golang.org/pprof
 test-profile:
 	go test ./pkg/index -bench . -benchtime=5000x -benchmem -cpuprofile profile.out
 	go tool pprof -web profile.out

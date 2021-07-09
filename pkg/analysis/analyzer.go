@@ -76,10 +76,9 @@ func (b Settings) filterTokens(tokens []string) []string {
 		if synonym, ok := b.Synonyms[token]; ok {
 			token = synonym
 		}
-		if _, ok := b.Stopwords[token]; ok {
-			continue
+		if _, ok := b.Stopwords[token]; !ok {
+			result = append(result, token)
 		}
-		result = append(result, token)
 	}
 	return result
 }
