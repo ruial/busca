@@ -61,6 +61,9 @@ func (i *Index) addDocument(document core.Document, idxMode indexMode) error {
 	terms := i.analyzer.Analyze(document.Text())
 	frequencies := core.NewTermFrequency(terms)
 
+	// an alternative to locks would be to use channels and get/set the index on a single thread
+	// https://stackoverflow.com/questions/27236827/idiomatic-way-to-make-a-request-response-communication-using-channels
+	// https://stackoverflow.com/questions/28650702/is-it-thread-safe-to-have-multiple-channels-for-communicating-with-a-single-shar
 	i.docsMutex.Lock()
 	defer i.docsMutex.Unlock()
 	id := document.ID()
